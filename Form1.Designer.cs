@@ -34,6 +34,7 @@
             this.listBoxMessages = new DevExpress.XtraEditors.ListBoxControl();
             this.textBoxMessage = new System.Windows.Forms.TextBox();
             this.buttonSelectFile = new DevExpress.XtraEditors.SimpleButton();
+            this.listBox1 = new System.Windows.Forms.ListBox();
             ((System.ComponentModel.ISupportInitialize)(this.listBoxMessages)).BeginInit();
             this.SuspendLayout();
             // 
@@ -68,7 +69,7 @@
             // 
             this.listBoxMessages.Location = new System.Drawing.Point(12, 143);
             this.listBoxMessages.Name = "listBoxMessages";
-            this.listBoxMessages.Size = new System.Drawing.Size(776, 295);
+            this.listBoxMessages.Size = new System.Drawing.Size(776, 138);
             this.listBoxMessages.TabIndex = 4;
             // 
             // textBoxMessage
@@ -87,11 +88,20 @@
             this.buttonSelectFile.Text = "выбрать изображение";
             this.buttonSelectFile.Click += new System.EventHandler(this.buttonSelectFile_Click);
             // 
+            // listBox1
+            // 
+            this.listBox1.FormattingEnabled = true;
+            this.listBox1.Location = new System.Drawing.Point(12, 288);
+            this.listBox1.Name = "listBox1";
+            this.listBox1.Size = new System.Drawing.Size(776, 147);
+            this.listBox1.TabIndex = 6;
+            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(800, 450);
+            this.Controls.Add(this.listBox1);
             this.Controls.Add(this.buttonSelectFile);
             this.Controls.Add(this.listBoxMessages);
             this.Controls.Add(this.buttonSend);
@@ -114,6 +124,7 @@
         private DevExpress.XtraEditors.ListBoxControl listBoxMessages;
         private System.Windows.Forms.TextBox textBoxMessage;
         private DevExpress.XtraEditors.SimpleButton buttonSelectFile;
+        private System.Windows.Forms.ListBox listBox1;
     }
 }
 

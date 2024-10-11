@@ -12,6 +12,7 @@ using System.Windows.Forms;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
+using System.Data.SQLite;
 
 namespace TestTCP
 {
@@ -22,6 +23,7 @@ namespace TestTCP
         public Form1()
         {
             InitializeComponent();
+            InitializeDatabase(); // Инициализация базы данных при запуске формы
         }
 
         private async void simpleButton1_Click(object sender, EventArgs e)
@@ -97,13 +99,13 @@ namespace TestTCP
                         }
                         else
                         {
-                            // Файл не найден
+                            // Обычное текстовое сообщение
                             Invoke((MethodInvoker)delegate
                             {
-                                listBoxMessages.Items.Add($"Ошибка: Файл не найден по пути: {clientMessage}");
+                                listBoxMessages.Items.Add($"Получено сообщение: {clientMessage}");
                             });
 
-                            byte[] buffer = Encoding.UTF8.GetBytes("Ошибка: Файл не найден");
+                            byte[] buffer = Encoding.UTF8.GetBytes("Сообщение получено");
                             await clientStream.WriteAsync(buffer, 0, buffer.Length);
                         }
                     }
@@ -117,12 +119,6 @@ namespace TestTCP
                 }
             }
         }
-
-
-
-
-
-
 
         private TcpClient client;
         private NetworkStream clientStream;
@@ -157,25 +153,41 @@ namespace TestTCP
 
             string messageToSend = textBoxMessage.Text; // Используем textBoxMessage для ввода сообщения
 
-            // Проверяем, выбран ли файл и существует ли он
-            if (string.IsNullOrEmpty(messageToSend) || !File.Exists(messageToSend))
-            {
-                MessageBox.Show("Пожалуйста, выберите существующий файл для отправки.");
-                return;
-            }
-
             try
             {
-                // Отправляем сообщение на сервер с использованием UTF-8
-                byte[] buffer = Encoding.UTF8.GetBytes(messageToSend);
-                await clientStream.WriteAsync(buffer, 0, buffer.Length); // Асинхронная отправка сообщения
+                if (messageToSend.Length > 2 && messageToSend[1] == ':' && messageToSend[2] == '\\')
+                {
+                    // Отправляем файл как путь к изображению
+                    if (File.Exists(messageToSend))
+                    {
+                        byte[] buffer = Encoding.UTF8.GetBytes(messageToSend);
+                        await clientStream.WriteAsync(buffer, 0, buffer.Length); // Асинхронная отправка пути к файлу
 
-                // Читаем ответ от сервера
-                byte[] responseBuffer = new byte[4096];
-                int bytesRead = await clientStream.ReadAsync(responseBuffer, 0, responseBuffer.Length); // Асинхронное чтение ответа
-                string responseMessage = Encoding.UTF8.GetString(responseBuffer, 0, bytesRead);
+                        // Читаем ответ от сервера
+                        byte[] responseBuffer = new byte[4096];
+                        int bytesRead = await clientStream.ReadAsync(responseBuffer, 0, responseBuffer.Length); // Асинхронное чтение ответа
+                        string responseMessage = Encoding.UTF8.GetString(responseBuffer, 0, bytesRead);
 
-                MessageBox.Show($"Ответ от сервера: {responseMessage}");
+                        MessageBox.Show($"Ответ от сервера: {responseMessage}");
+                    }
+                    else
+                    {
+                        MessageBox.Show("Пожалуйста, выберите существующий файл для отправки.");
+                    }
+                }
+                else
+                {
+                    // Отправляем текстовое сообщение
+                    byte[] buffer = Encoding.UTF8.GetBytes(messageToSend);
+                    await clientStream.WriteAsync(buffer, 0, buffer.Length); // Асинхронная отправка сообщения
+
+                    // Читаем ответ от сервера
+                    byte[] responseBuffer = new byte[4096];
+                    int bytesRead = await clientStream.ReadAsync(responseBuffer, 0, responseBuffer.Length); // Асинхронное чтение ответа
+                    string responseMessage = Encoding.UTF8.GetString(responseBuffer, 0, bytesRead);
+
+                    MessageBox.Show($"Ответ от сервера: {responseMessage}");
+                }
             }
             catch (SocketException ex)
             {
@@ -186,9 +198,6 @@ namespace TestTCP
                 MessageBox.Show($"Произошла ошибка: {ex.Message}");
             }
         }
-
-
-        
 
         private void buttonSelectFile_Click(object sender, EventArgs e)
         {
@@ -251,6 +260,10 @@ namespace TestTCP
                 // Отображаем количество объектов в ListBox
                 listBoxMessages.Items.Add($"Количество объектов на изображении: {numberOfObjects}");
 
+                // Сохранение результатов в базу данных
+                string result = numberOfObjects == 50 ? "OK" : "NG";
+                SaveAnalysisToDatabase(imagePath, numberOfObjects.I, result);
+
                 // Освобождаем ресурсы
                 image.Dispose();
                 thresholdedRegions.Dispose();
@@ -258,7 +271,7 @@ namespace TestTCP
                 selectedRegions.Dispose();
 
                 // Возвращаем результат анализа
-                return numberOfObjects == 19 ? "OK" : "NG";
+                return result;
             }
             catch (Exception ex)
             {
@@ -267,29 +280,73 @@ namespace TestTCP
             }
         }
 
+        public void InitializeDatabase()
+        {
+            string connectionString = "Data Source=analyzed_data.db;Version=3;";
+            using (SQLiteConnection conn = new SQLiteConnection(connectionString))
+            {
+                conn.Open();
 
+                string createTableQuery = @"CREATE TABLE IF NOT EXISTS ImageAnalysis (
+                                    Id INTEGER PRIMARY KEY,
+                                    ImagePath TEXT,
+                                    ObjectCount INTEGER,
+                                    Result TEXT)";
+                using (SQLiteCommand command = new SQLiteCommand(createTableQuery, conn))
+                {
+                    command.ExecuteNonQuery();
+                }
+            }
+        }
 
+        public void SaveAnalysisToDatabase(string imagePath, int objectCount, string result)
+        {
+            string connectionString = "Data Source=analyzed_data.db;Version=3;";
+            using (SQLiteConnection conn = new SQLiteConnection(connectionString))
+            {
+                conn.Open();
+                string insertQuery = "INSERT INTO ImageAnalysis (ImagePath, ObjectCount, Result) VALUES (@imagePath, @objectCount, @result)";
+                using (SQLiteCommand command = new SQLiteCommand(insertQuery, conn))
+                {
+                    command.Parameters.AddWithValue("@imagePath", imagePath);
+                    command.Parameters.AddWithValue("@objectCount", objectCount);
+                    command.Parameters.AddWithValue("@result", result);
+                    command.ExecuteNonQuery();
+                }
+            }
+        }
 
+        public void LoadAnalysisData()
+        {
+            string connectionString = "Data Source=analyzed_data.db;Version=3;";
+            using (SQLiteConnection conn = new SQLiteConnection(connectionString))
+            {
+                conn.Open();
+                string selectQuery = "SELECT * FROM ImageAnalysis";
+                using (SQLiteCommand command = new SQLiteCommand(selectQuery, conn))
+                {
+                    using (SQLiteDataReader reader = command.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            // Добавляем данные в элемент управления, например, ListBox или DataGridView
+                            listBoxMessages.Items.Add($"ID: {reader["Id"]}, Path: {reader["ImagePath"]}, Count: {reader["ObjectCount"]}, Result: {reader["Result"]}");
+                        }
+                    }
+                }
+            }
+        }
 
+        private void buttonLoadData_Click(object sender, EventArgs e)
+        {
+            LoadAnalysisData();
+        }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            tcpListener?.Stop(); // Останавливаем прослушивание TCP соединений
+            client?.Close(); // Закрываем клиентское соединение
+            base.OnFormClosing(e);
+        }
     }
 }
